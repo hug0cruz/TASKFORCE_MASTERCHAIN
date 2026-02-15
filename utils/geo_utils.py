@@ -1,11 +1,9 @@
 from geopy.distance import geodesic
 
 
-def calculate_distances(df, user_lat, user_lon):
-
-    df["Distância (km)"] = [
-        geodesic((user_lat, user_lon), (lat, lon)).km
-        for lat, lon in zip(df["Latitudine"], df["Longitudine"])
-    ]
-
-    return df.sort_values(by="Distância (km)", ascending=True)
+def compute_distances_km(user_lat: float, user_lon: float, lats: list[float], lons: list[float]) -> list[float]:
+    out = []
+    origin = (user_lat, user_lon)
+    for a, b in zip(lats, lons):
+        out.append(geodesic(origin, (a, b)).km)
+    return out

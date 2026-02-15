@@ -2,6 +2,7 @@ import re
 import folium
 from folium.plugins import MarkerCluster
 
+
 BLACK_ISSUES = {
     "FALLEN TOWER",
     "FORBIDDEN TOWER",
@@ -9,41 +10,35 @@ BLACK_ISSUES = {
     "INFRA",
 }
 
+
 def _norm_text(s: str) -> str:
     s = "" if s is None else str(s)
     s = s.replace("\n", " ").replace("\r", " ")
     s = re.sub(r"\s+", " ", s).strip()
     return s.upper()
 
+
 def build_map(df, user_lat, user_lon, use_cluster=True, route_order=None):
-    """
-    route_order: lista de Cod Site na ordem para desenhar a linha (rota).
-    NÃO desenha marcadores numerados. Só a linha.
-    """
     if route_order is None:
         route_order = []
 
-    mapa = folium.Map(
-        location=[user_lat, user_lon],
-        zoom_start=10,
-        control_scale=True
-    )
+    mapa = folium.Map(location=[user_lat, user_lon], zoom_start=10, control_scale=True)
 
-    # Utilizador
+    # utilizador
     folium.Marker(
         location=[user_lat, user_lon],
         popup="📍 Tu estás aqui",
-        icon=folium.Icon(color="blue", icon="user")
+        icon=folium.Icon(color="blue", icon="user"),
     ).add_to(mapa)
 
     layer = MarkerCluster().add_to(mapa) if use_cluster else mapa
 
-    # --- markers ---
+    # markers
     for _, row in df.iterrows():
-        lat = row["Latitudine"]
-        lon = row["Longitudine"]
+        lat = float(row["Latitudine"])
+        lon = float(row["Longitudine"])
 
-        cod = _norm_text(row.get("Cod Site", ""))
+        cod = _norm_text(row.get("Cod Site", "SEM_CODIGO"))
         issue_raw = row.get("Issue", "Sem alerta")
         issue_clean = re.sub(r"\s+", " ", str(issue_raw).replace("\n", " ").replace("\r", " ")).strip()
         issue_u = _norm_text(issue_raw)
@@ -77,7 +72,6 @@ def build_map(df, user_lat, user_lon, use_cluster=True, route_order=None):
         </div>
         """
 
-        # GW -> estrela + código
         if gw_type == "GW":
             icon_html = f"""
             <div style="text-align:center; line-height:1;">
@@ -87,11 +81,9 @@ def build_map(df, user_lat, user_lon, use_cluster=True, route_order=None):
             """
             folium.Marker(
                 location=[lat, lon],
-                icon=folium.DivIcon(html=icon_html),
-                popup=folium.Popup(popup_html, max_width=320)
+                icon=folium.DivIcon(html=icon_html, icon_size=(40,40), icon_anchor=(20,20) ),
+                popup=folium.Popup(popup_html, max_width=320),
             ).add_to(layer)
-
-        # NGW -> bolinha + label afastado
         else:
             folium.CircleMarker(
                 location=[lat, lon],
@@ -99,9 +91,10 @@ def build_map(df, user_lat, user_lon, use_cluster=True, route_order=None):
                 color=color,
                 fill=True,
                 fill_color=color,
-                fill_opacity=1
+                fill_opacity=1,
             ).add_to(layer)
 
+            # label afastado
             label_html = f"""
             <div style="
                 position: relative;
@@ -117,10 +110,10 @@ def build_map(df, user_lat, user_lon, use_cluster=True, route_order=None):
             folium.Marker(
                 location=[lat, lon],
                 icon=folium.DivIcon(html=label_html),
-                popup=folium.Popup(popup_html, max_width=320)
+                popup=folium.Popup(popup_html, max_width=320),
             ).add_to(layer)
 
-    # --- linha (rota) ---
+    # rota (linha)
     if route_order:
         df_idx = df.copy()
         df_idx["Cod Site"] = df_idx["Cod Site"].astype(str).map(_norm_text)
@@ -136,10 +129,6 @@ def build_map(df, user_lat, user_lon, use_cluster=True, route_order=None):
                 route_points.append(coords_by_site[su])
 
         if len(route_points) >= 2:
-            folium.PolyLine(
-                locations=route_points,
-                weight=4,
-                opacity=0.9,
-            ).add_to(mapa)
+            folium.PolyLine(route_points, color="black", weight=2, opacity=1).add_to(mapa)
 
     return mapa
