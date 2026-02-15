@@ -24,7 +24,7 @@ def build_map(df, user_lat, user_lon, use_cluster=True, route_order=None):
 
     mapa = folium.Map(location=[user_lat, user_lon], zoom_start=10, control_scale=True)
 
-    # utilizador
+    # Utilizador
     folium.Marker(
         location=[user_lat, user_lon],
         popup="📍 Tu estás aqui",
@@ -33,7 +33,7 @@ def build_map(df, user_lat, user_lon, use_cluster=True, route_order=None):
 
     layer = MarkerCluster().add_to(mapa) if use_cluster else mapa
 
-    # markers
+    # --- MARKERS ---
     for _, row in df.iterrows():
         lat = float(row["Latitudine"])
         lon = float(row["Longitudine"])
@@ -46,7 +46,7 @@ def build_map(df, user_lat, user_lon, use_cluster=True, route_order=None):
         tip = _norm_text(row.get("Tip Alarma", ""))
         gw_type = _norm_text(row.get("GW", ""))
 
-        # cor
+        # Cor
         if issue_u in BLACK_ISSUES:
             color = "black"
         else:
@@ -72,18 +72,53 @@ def build_map(df, user_lat, user_lon, use_cluster=True, route_order=None):
         </div>
         """
 
+        # --- GW = ESTRELA (tamanho da bola) ---
         if gw_type == "GW":
+            # Bola é radius=7 (diametro ~14px). Estrela ~14px para ficar equivalente.
+            # Caixa do icon: 22x22 para ancorar no centro sem distorções.
+            icon_size = 22
+            anchor = icon_size // 2  # 11
+
+            star_font = 28  # equivalente visual ao diâmetro da bola (~14px)
+
             icon_html = f"""
-            <div style="text-align:center; line-height:1;">
-              <div style="font-size:22px; color:{color};">★</div>
-              <div style="font-size:11px; font-weight:700; color:#000; margin-top:2px;">{cod}</div>
+            <div style="position: relative; width:{icon_size}px; height:{icon_size}px;">
+              <div style="
+                position:absolute;
+                left:50%;
+                top:50%;
+                transform: translate(-50%, -50%);
+                font-size:{star_font}px;
+                line-height:{star_font}px;
+                color:{color};
+              ">★</div>
+
+              <!-- texto por baixo, fora da caixa visual do ícone -->
+              <div style="
+                position:absolute;
+                left:50%;
+                top:{icon_size + 2}px;
+                transform: translateX(-50%);
+                font-size:11px;
+                font-weight:700;
+                color:#000;
+                white-space:nowrap;
+                text-shadow: 0 0 2px rgba(255,255,255,0.8);
+              ">{cod}</div>
             </div>
             """
+
             folium.Marker(
                 location=[lat, lon],
-                icon=folium.DivIcon(html=icon_html, icon_size=(40,40), icon_anchor=(20,20) ),
+                icon=folium.DivIcon(
+                    html=icon_html,
+                    icon_size=(icon_size, icon_size),
+                    icon_anchor=(anchor, anchor),  # centro real da estrela
+                ),
                 popup=folium.Popup(popup_html, max_width=320),
             ).add_to(layer)
+
+        # --- NGW = BOLA ---
         else:
             folium.CircleMarker(
                 location=[lat, lon],
@@ -94,7 +129,7 @@ def build_map(df, user_lat, user_lon, use_cluster=True, route_order=None):
                 fill_opacity=1,
             ).add_to(layer)
 
-            # label afastado
+            # Label afastado
             label_html = f"""
             <div style="
                 position: relative;
@@ -113,10 +148,11 @@ def build_map(df, user_lat, user_lon, use_cluster=True, route_order=None):
                 popup=folium.Popup(popup_html, max_width=320),
             ).add_to(layer)
 
-    # rota (linha)
+    # --- ROTA (linha fina e preta) ---
     if route_order:
         df_idx = df.copy()
         df_idx["Cod Site"] = df_idx["Cod Site"].astype(str).map(_norm_text)
+
         coords_by_site = {
             r["Cod Site"]: (float(r["Latitudine"]), float(r["Longitudine"]))
             for _, r in df_idx.iterrows()
@@ -129,6 +165,11 @@ def build_map(df, user_lat, user_lon, use_cluster=True, route_order=None):
                 route_points.append(coords_by_site[su])
 
         if len(route_points) >= 2:
-            folium.PolyLine(route_points, color="black", weight=2, opacity=1).add_to(mapa)
+            folium.PolyLine(
+                route_points,
+                color="black",
+                weight=2,
+                opacity=1,
+            ).add_to(mapa)
 
     return mapa
